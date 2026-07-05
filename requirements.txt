@@ -1,12 +1,11 @@
 streamlit
-google-genai
-sentence-transformers
 faiss-cpu
+sentence-transformers
+openai
+python-dotenv
 numpy
 pandas
-pypdf
+PyPDF2
 python-docx
 openpyxl
-python-dotenv
 reportlab
-gTTS
