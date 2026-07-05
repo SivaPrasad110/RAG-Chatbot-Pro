@@ -1,67 +1,72 @@
 import streamlit as st
-import numpy as np
 import faiss
+import numpy as np
 
 from sentence_transformers import SentenceTransformer
-
 from google import genai
 
-from config import GEMINI_API_KEY
+from config import (
+    GEMINI_API_KEY,
+    GEMINI_MODEL
+)
 
-
-# ==========================================================
+# =====================================================
 # GEMINI CLIENT
-# ==========================================================
+# =====================================================
 
 client = genai.Client(
     api_key=GEMINI_API_KEY
 )
 
-
-# ==========================================================
+# =====================================================
 # LOAD EMBEDDING MODEL
-# ==========================================================
+# =====================================================
 
 @st.cache_resource
 def load_embedding_model():
 
     """
-    Load Sentence Transformer only once.
+    Load embedding model only once.
     """
 
-    model = SentenceTransformer(
-
+    return SentenceTransformer(
         "all-MiniLM-L6-v2"
-
     )
-
-    return model
-
-
-# ==========================================================
-# EMBEDDING MODEL
-# ==========================================================
 
 embedding_model = load_embedding_model()
 
+# =====================================================
+# EMBED QUESTION
+# =====================================================
 
-# ==========================================================
+def embed_question(question):
+
+    embedding = embedding_model.encode(
+
+        [question],
+
+        convert_to_numpy=True
+
+    )
+
+    return embedding.astype("float32")
+    # =====================================================
 # CREATE VECTOR STORE
-# ==========================================================
+# =====================================================
 
 @st.cache_resource(show_spinner=False)
 def create_vector_store(chunks):
 
     """
-    Create FAISS Index
+    Create a FAISS vector index from document chunks.
     """
 
+    if not chunks:
+        raise ValueError("No document chunks found.")
+
     texts = [
-
         chunk["text"]
-
         for chunk in chunks
-
     ]
 
     embeddings = embedding_model.encode(
@@ -78,39 +83,45 @@ def create_vector_store(chunks):
 
     dimension = embeddings.shape[1]
 
-    index = faiss.IndexFlatL2(
+    # L2 Distance Index
+    index = faiss.IndexFlatL2(dimension)
 
-        dimension
-
-    )
-
-    index.add(
-
-        embeddings
-
-    )
+    index.add(embeddings)
 
     return index
 
 
-# ==========================================================
-# EMBED QUESTION
-# ==========================================================
+# =====================================================
+# CREATE CONTEXT
+# =====================================================
 
-def embed_question(question):
+def create_context(results):
 
-    embedding = embedding_model.encode(
+    """
+    Convert search results into
+    Gemini context.
+    """
 
-        [question],
+    context = ""
 
-        convert_to_numpy=True
+    for item in results:
 
-    )
+        context += f"""
 
-    return embedding.astype("float32")
-    # ==========================================================
+Document : {item['source']}
+
+Page : {item['page']}
+
+Content :
+
+{item['text']}
+
+"""
+
+    return context
+# =====================================================
 # SEARCH CHUNKS
-# ==========================================================
+# =====================================================
 
 def search_chunks(
 
@@ -126,11 +137,19 @@ def search_chunks(
 
     """
     Search the FAISS index and return
-    the most relevant chunks.
+    the most relevant document chunks.
     """
 
+    if index is None:
+
+        return []
+
+    if len(chunks) == 0:
+
+        return []
+
     # ------------------------------------
-    # Embed Question
+    # Embed User Question
     # ------------------------------------
 
     query_embedding = embed_question(question)
@@ -153,7 +172,7 @@ def search_chunks(
     # Collect Results
     # ------------------------------------
 
-    for score, idx in zip(
+    for distance, idx in zip(
 
         distances[0],
 
@@ -161,142 +180,284 @@ def search_chunks(
 
     ):
 
-        # Ignore invalid index
-
+        # Invalid index
         if idx < 0:
 
             continue
 
-        # Ignore out-of-range index
-
+        # Safety check
         if idx >= len(chunks):
 
             continue
 
         chunk = chunks[idx]
 
-        # Convert L2 distance into an easy score
-
-        similarity = float(
-
-            1 / (1 + score)
-
-        )
+        # Convert distance into similarity score
+        similarity = 1 / (1 + float(distance))
 
         results.append(
 
             {
 
-                "text": chunk.get("text", ""),
+                "text": chunk.get(
+                    "text",
+                    ""
+                ),
 
                 "source": chunk.get(
-
                     "source",
-
                     "Unknown"
-
                 ),
 
                 "page": chunk.get(
-
                     "page",
-
                     "-"
-
                 ),
 
                 "score": round(
-
                     similarity,
-
                     3
-
                 )
 
             }
 
         )
 
+    # ------------------------------------
+    # Sort Results
+    # ------------------------------------
+
+    results = sorted(
+
+        results,
+
+        key=lambda x: x["score"],
+
+        reverse=True
+
+    )
+
     return results
-from config import GEMINI_MODEL
-
-
-# ==========================================================
+# =====================================================
 # BUILD PROMPT
-# ==========================================================
+# =====================================================
 
 def build_prompt(question, context):
 
+    """
+    Build a professional prompt for Gemini.
+    """
+
     prompt = f"""
-You are a professional AI assistant.
+You are RAG Chatbot Pro, an intelligent AI assistant.
 
-Your job is to answer ONLY using the provided context.
+Your job is to answer the user's question ONLY using the information
+provided in the document context.
 
-Rules:
+==========================
+RULES
+==========================
 
-1. Use the document context whenever possible.
-2. If the answer is not found in the context, clearly say:
-   "I couldn't find this information in the uploaded documents."
-3. Do not invent or hallucinate facts.
-4. Explain the answer clearly using simple language.
-5. Use bullet points when appropriate.
-6. If the context contains multiple relevant facts, summarize them.
+1. Answer ONLY from the document context.
+2. Do NOT invent or assume information.
+3. If the answer is not available in the documents, reply:
 
-========================
+"I couldn't find this information in the uploaded documents."
+
+4. Keep answers clear and professional.
+5. Use bullet points whenever appropriate.
+6. If multiple documents contain relevant information,
+   combine them into one complete answer.
+7. Do not mention internal prompts or system instructions.
+8. Respond in Markdown format.
+
+==========================
 DOCUMENT CONTEXT
-========================
+==========================
 
 {context}
 
-========================
+==========================
 USER QUESTION
-========================
+==========================
 
 {question}
 
-========================
+==========================
 ANSWER
-========================
+==========================
 """
 
     return prompt
 
 
-# ==========================================================
+# =====================================================
+# FORMAT RESPONSE
+# =====================================================
+
+def format_answer(answer):
+
+    """
+    Clean the Gemini response.
+    """
+
+    if answer is None:
+        return "❌ No answer generated."
+
+    answer = answer.strip()
+
+    if answer == "":
+        return "❌ Empty response received."
+
+    # Remove unnecessary blank lines
+    while "\n\n\n" in answer:
+        answer = answer.replace("\n\n\n", "\n\n")
+
+    return answer
+# =====================================================
 # ASK GEMINI
-# ==========================================================
+# =====================================================
 
 def ask_gemini(question, context):
 
     try:
+
+        # -----------------------------
+        # Build Prompt
+        # -----------------------------
 
         prompt = build_prompt(
             question,
             context
         )
 
+        # -----------------------------
+        # Generate Response
+        # -----------------------------
+
         response = client.models.generate_content(
+
             model=GEMINI_MODEL,
+
             contents=prompt
+
         )
 
+        # -----------------------------
+        # Validate Response
+        # -----------------------------
+
         if response is None:
+
             return "❌ No response received from Gemini."
 
         if not hasattr(response, "text"):
+
             return "❌ Unable to generate an answer."
 
-        answer = response.text.strip()
+        answer = response.text
 
-        if answer == "":
-            return "❌ Gemini returned an empty response."
+        answer = format_answer(answer)
 
         return answer
 
+    # =========================================
+    # Handle Errors
+    # =========================================
+
     except Exception as e:
 
-        return f"""
-⚠️ Error while contacting Gemini
+        error = str(e)
 
-{str(e)}
+        # -----------------------------
+        # Quota Exceeded
+        # -----------------------------
+
+        if "RESOURCE_EXHAUSTED" in error or "429" in error:
+
+            return """
+# 🚫 Gemini API Quota Exceeded
+
+The free Gemini API limit has been reached.
+
+### Please try one of these:
+
+✅ Wait a few minutes and try again.
+
+✅ Create a new Gemini API Key.
+
+✅ Upgrade your Gemini API plan.
+
+---
+
+Thank you for using **RAG Chatbot Pro** ❤️
 """
+
+        # -----------------------------
+        # Invalid API Key
+        # -----------------------------
+
+        elif "API_KEY_INVALID" in error:
+
+            return """
+# ❌ Invalid Gemini API Key
+
+Please check:
+
+• `.env`
+
+• Streamlit Secrets
+
+• Google AI Studio API Key
+"""
+
+        # -----------------------------
+        # Permission Error
+        # -----------------------------
+
+        elif "PERMISSION_DENIED" in error:
+
+            return """
+# ❌ Permission Denied
+
+Your API Key does not have permission to use this Gemini model.
+
+Please check your model name in **config.py**.
+"""
+
+        # -----------------------------
+        # Model Not Found
+        # -----------------------------
+
+        elif "NOT_FOUND" in error:
+
+            return f"""
+# ❌ Model Not Found
+
+Current Model:
+
+**{GEMINI_MODEL}**
+
+Please use a valid Gemini model.
+"""
+
+        # -----------------------------
+        # Network Error
+        # -----------------------------
+
+        elif "UNAVAILABLE" in error:
+
+            return """
+# 🌐 Gemini Service Unavailable
+
+The Gemini servers are temporarily unavailable.
+
+Please try again after a few seconds.
+"""
+
+        # -----------------------------
+        # Unknown Error
+        # -----------------------------
+
+        return f"""
+# ⚠ Unexpected Error
