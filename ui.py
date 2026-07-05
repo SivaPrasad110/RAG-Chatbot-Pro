@@ -9,31 +9,13 @@ def hero_section():
 
     st.markdown(
         """
-        <div class="hero">
+# 🤖 RAG Chatbot Pro
 
-            <h1 class="main-title">
+### Hello, Siva 👋
 
-                🤖 RAG Chatbot Pro
-
-            </h1>
-
-            <p class="sub-title">
-
-                Hello, Siva 👋
-
-            </p>
-
-            <p style="text-align:center;color:#94A3B8;font-size:18px;">
-
-                How can I help you today?
-
-            </p>
-
-        </div>
-        """,
-        unsafe_allow_html=True
+How can I help you today?
+"""
     )
-
 
 # =====================================================
 # SUGGESTION CARDS
