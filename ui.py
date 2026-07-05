@@ -423,38 +423,17 @@ def footer():
 
     st.markdown(
         """
-<div style="
+<div style="text-align:center;padding:20px;color:#9CA3AF;">
 
-text-align:center;
-
-padding:20px;
-
-color:#9CA3AF;
-
-">
-
-<h3>
-
-🤖 RAG Chatbot Pro
-
-</h3>
+<h3>🤖 RAG Chatbot Pro</h3>
 
 <p>
-
 Powered by
-
-<b>
-
-Gemini AI • FAISS • Sentence Transformers
-
-</b>
-
+<b>Gemini AI • FAISS • Sentence Transformers</b>
 </p>
 
 <p>
-
-Made with ❤️ by Siva Prasad
-
+Made with ❤️ by <b>Siva Prasad</b>
 </p>
 
 </div>
