@@ -11,7 +11,7 @@ def hero_section():
         """
 # 🤖 RAG Chatbot Pro
 
-### Hello, Siva 👋
+### Hello👋
 
 How can I help you today?
 """
