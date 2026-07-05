@@ -1,6 +1,5 @@
-import streamlit as st
 import os
-
+import streamlit as st
 
 from utils import (
     read_pdf,
@@ -18,49 +17,72 @@ from rag import (
 )
 
 from analytics import show_dashboard
-from export import export_txt, export_markdown, export_pdf
+from export import (
+    export_txt,
+    export_markdown,
+    export_pdf
+)
 
-# ===================================
+# =====================================
 # PAGE CONFIG
-# ===================================
+# =====================================
 
 st.set_page_config(
-
     page_title="Professional RAG Chatbot",
     page_icon="🤖",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# ===================================
+# =====================================
+# CUSTOM CSS (ChatGPT Style)
+# =====================================
+
+st.markdown("""
+<style>
+
+.block-container{
+    padding-top:2rem;
+}
+
+h1{
+    text-align:center;
+}
+
+.stChatMessage{
+    border-radius:15px;
+}
+
+.stButton>button{
+    width:100%;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+# =====================================
 # SESSION STATE
-# ===================================
+# =====================================
 
 if "messages" not in st.session_state:
-    st.session_state.messages = []
+    st.session_state.messages=[]
 
 if "chunks" not in st.session_state:
-    st.session_state.chunks = []
+    st.session_state.chunks=[]
 
 if "index" not in st.session_state:
-    st.session_state.index = None
+    st.session_state.index=None
 
 if "documents_loaded" not in st.session_state:
-    st.session_state.documents_loaded = False
+    st.session_state.documents_loaded=False
 
-if "theme" not in st.session_state:
-    st.session_state.theme = "Light"
-
-# ===================================
+# =====================================
 # SIDEBAR
-# ===================================
+# =====================================
 
 with st.sidebar:
 
     st.title("🤖 RAG Chatbot")
-
-    # Sidebar controls (upload/scalars/voice)
-
 
     st.markdown("---")
 
@@ -84,17 +106,17 @@ with st.sidebar:
 
     top_k = st.slider(
         "Top Matching Chunks",
-        min_value=1,
-        max_value=10,
-        value=3
+        1,
+        10,
+        3
     )
 
     chunk_size = st.slider(
         "Chunk Size",
         200,
-        1000,
-        500,
-        step=100
+        1200,
+        600,
+        100
     )
 
     overlap = st.slider(
@@ -102,42 +124,19 @@ with st.sidebar:
         0,
         300,
         100,
-        step=20
-    )
-
-    from speech import (
-        speak,
-        listen
+        20
     )
 
     st.markdown("---")
 
-    st.subheader("🎤 Voice")
-
-    voice_question = ""
-
-    if st.button("🎙 Speak Question"):
-        voice_question = listen()
-        if voice_question:
-            st.success(voice_question)
-
-    st.caption("(Use the chat input below to send questions.)")
-
-    # Optional: speak last assistant answer
-    if st.button("🔊 Read Last Answer"):
-        if st.session_state.messages:
-            last_msg = st.session_state.messages[-1]
-            if last_msg.get("role") == "assistant":
-                speak(last_msg.get("content", ""))
-
-    st.sidebar.subheader("📥 Export Chat")
+    st.subheader("📥 Export Chat")
 
     txt_data = export_txt(
         st.session_state.messages
     )
 
-    st.sidebar.download_button(
-        "TXT",
+    st.download_button(
+        "Download TXT",
         txt_data,
         "chat.txt"
     )
@@ -146,64 +145,52 @@ with st.sidebar:
         st.session_state.messages
     )
 
-    st.sidebar.download_button(
-        "Markdown",
+    st.download_button(
+        "Download Markdown",
         md_data,
         "chat.md"
     )
 
-if st.sidebar.button("Generate PDF"):
+    if st.button("Generate PDF"):
 
-    pdf_path = export_pdf(
-        st.session_state.messages
-    )
-
-    with open(pdf_path, "rb") as pdf:
-
-        st.sidebar.download_button(
-            "Download PDF",
-            pdf,
-            "chat.pdf"
+        pdf_path = export_pdf(
+            st.session_state.messages
         )
-    st.markdown("---")
 
-    st.subheader("🎨 Theme")
+        with open(pdf_path,"rb") as pdf:
 
-    st.session_state.theme = st.selectbox(
-        "Select Theme",
-        [
-            "Light",
-            "Dark"
-        ]
-    )
+            st.download_button(
+                "Download PDF",
+                pdf,
+                "chat.pdf"
+            )
 
     st.markdown("---")
 
     if st.button("🗑 Clear Chat"):
 
-        st.session_state.messages = []
+        st.session_state.messages=[]
 
         st.rerun()
 
-# ===================================
-# TITLE
-# ===================================
+# =====================================
+# MAIN TITLE
+# =====================================
 
 st.title("🤖 Professional RAG Chatbot")
 
 st.caption(
-    "Upload your documents and ask intelligent questions using Gemini AI + FAISS."
+    "Powered by Gemini • FAISS • Sentence Transformers"
 )
-
-# ===================================
+# =====================================
 # DOCUMENT PROCESSING
-# ===================================
+# =====================================
 
 if uploaded_files:
 
     all_pages = []
 
-    with st.spinner("📚 Reading documents..."):
+    with st.spinner("📚 Reading uploaded documents..."):
 
         progress = st.progress(0)
 
@@ -211,28 +198,83 @@ if uploaded_files:
 
         for i, file in enumerate(uploaded_files):
 
+            extension = os.path.splitext(file.name)[1].lower()
+
             try:
 
-                extension = os.path.splitext(file.name)[1].lower()
+                # --------------------
+                # PDF
+                # --------------------
 
                 if extension == ".pdf":
-                    all_pages.extend(read_pdf(file))
+
+                    pages = read_pdf(file)
+
+                    for page in pages:
+
+                        page["source"] = file.name
+
+                    all_pages.extend(pages)
+
+                # --------------------
+                # DOCX
+                # --------------------
 
                 elif extension == ".docx":
-                    all_pages.extend(read_docx(file))
+
+                    pages = read_docx(file)
+
+                    for page in pages:
+
+                        page["source"] = file.name
+
+                    all_pages.extend(pages)
+
+                # --------------------
+                # TXT
+                # --------------------
 
                 elif extension == ".txt":
-                    all_pages.extend(read_txt(file))
+
+                    pages = read_txt(file)
+
+                    for page in pages:
+
+                        page["source"] = file.name
+
+                    all_pages.extend(pages)
+
+                # --------------------
+                # CSV
+                # --------------------
 
                 elif extension == ".csv":
-                    all_pages.extend(read_csv(file))
+
+                    pages = read_csv(file)
+
+                    for page in pages:
+
+                        page["source"] = file.name
+
+                    all_pages.extend(pages)
+
+                # --------------------
+                # Excel
+                # --------------------
 
                 elif extension == ".xlsx":
-                    all_pages.extend(read_excel(file))
+
+                    pages = read_excel(file)
+
+                    for page in pages:
+
+                        page["source"] = file.name
+
+                    all_pages.extend(pages)
 
             except Exception as e:
 
-                st.error(f"Error reading {file.name}")
+                st.error(f"❌ Error reading {file.name}")
 
                 st.exception(e)
 
@@ -240,53 +282,91 @@ if uploaded_files:
 
         progress.empty()
 
-    st.success(f"Loaded {len(uploaded_files)} documents")
+# =====================================
+# DOCUMENT SUMMARY
+# =====================================
 
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("📄 Uploaded Files")
-
-    for file in uploaded_files:
-        st.sidebar.success(file.name)
-
-    chunks = split_text(
-        all_pages,
-        chunk_size=chunk_size,
-        overlap=overlap
+    st.success(
+        f"✅ Successfully loaded {len(uploaded_files)} document(s)"
     )
 
-    with st.spinner("🔍 Creating Vector Database..."):
+    with st.expander(
+        "📂 Uploaded Documents",
+        expanded=False
+    ):
 
-        index = create_vector_store(chunks)
+        for file in uploaded_files:
+
+            st.write(
+                f"📄 {file.name}"
+            )
+
+# =====================================
+# CHUNKING
+# =====================================
+
+    with st.spinner("✂ Splitting documents into chunks..."):
+
+        chunks = split_text(
+            all_pages,
+            chunk_size=chunk_size,
+            overlap=overlap
+        )
+
+# =====================================
+# VECTOR STORE
+# =====================================
+
+    with st.spinner("🧠 Creating Vector Database..."):
+
+        index = create_vector_store(
+            chunks
+        )
+
+# =====================================
+# SAVE SESSION
+# =====================================
 
     st.session_state.chunks = chunks
+
     st.session_state.index = index
+
     st.session_state.documents_loaded = True
 
-# ===================================
+    st.sidebar.markdown("---")
+
+    st.sidebar.success(
+        f"📚 Total Chunks : {len(chunks)}"
+    )
+
+# =====================================
 # CHAT HISTORY
-# ===================================
+# =====================================
 
 for message in st.session_state.messages:
 
-    with st.chat_message(message["role"]):
+    with st.chat_message(
+        message["role"]
+    ):
 
-        st.markdown(message["content"])
-
-# ===================================
+        st.markdown(
+            message["content"]
+        )
+# =====================================
 # CHAT INPUT
-# ===================================
+# =====================================
 
 if st.session_state.documents_loaded:
 
     question = st.chat_input(
-        "Ask anything about your uploaded documents..."
+        "💬 Ask anything about your uploaded documents..."
     )
 
     if question:
 
-        # -------------------------
-        # USER MESSAGE
-        # -------------------------
+        # ----------------------------------
+        # Save User Message
+        # ----------------------------------
 
         st.session_state.messages.append(
             {
@@ -298,22 +378,23 @@ if st.session_state.documents_loaded:
         with st.chat_message("user"):
             st.markdown(question)
 
-        # -------------------------
-        # SEARCH
-        # -------------------------
+        # ----------------------------------
+        # Search Similar Chunks
+        # ----------------------------------
 
-        with st.spinner("Searching..."):
+        with st.spinner("🔍 Searching documents..."):
 
             results = search_chunks(
-                question,
-                st.session_state.chunks,
-                st.session_state.index,
-                top_k
+                question=question,
+                chunks=st.session_state.chunks,
+                index=st.session_state.index,
+                top_k=top_k
             )
 
-        # -------------------------
-        # CREATE CONTEXT
-        # -------------------------
+        # ----------------------------------
+        # Build Context
+        # (Hidden from User)
+        # ----------------------------------
 
         context = ""
 
@@ -331,16 +412,20 @@ Content :
 
 """
 
-        # -------------------------
-        # GEMINI
-        # -------------------------
+        # ----------------------------------
+        # Gemini
+        # ----------------------------------
 
-        with st.spinner("Gemini is thinking..."):
+        with st.spinner("🤖 Gemini is thinking..."):
 
             answer = ask_gemini(
                 question,
                 context
             )
+
+        # ----------------------------------
+        # Save Assistant Message
+        # ----------------------------------
 
         st.session_state.messages.append(
             {
@@ -349,87 +434,210 @@ Content :
             }
         )
 
-        # -------------------------
-        # ASSISTANT
-        # -------------------------
+        # ----------------------------------
+        # Display Assistant
+        # ----------------------------------
 
         with st.chat_message("assistant"):
 
             st.markdown(answer)
 
-            st.markdown("---")
+        # ----------------------------------
+        # Analytics
+        # ----------------------------------
 
-            st.subheader("📚 Sources")
+        try:
 
-            for i, item in enumerate(results):
+            show_dashboard(
+                st.session_state.messages
+            )
 
-                st.markdown(
-                    f"""
-### 📄 {item['source']}
+        except:
+            pass
 
-**Page:** {item['page']}
-"""
+        # ----------------------------------
+        # Export Buttons
+        # ----------------------------------
+
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+
+            st.download_button(
+                "📄 TXT",
+                export_txt(
+                    st.session_state.messages
+                ),
+                "chat.txt",
+                mime="text/plain"
+            )
+
+        with col2:
+
+            st.download_button(
+                "📝 Markdown",
+                export_markdown(
+                    st.session_state.messages
+                ),
+                "chat.md",
+                mime="text/markdown"
+            )
+
+        with col3:
+
+            pdf_path = export_pdf(
+                st.session_state.messages
+            )
+
+            with open(pdf_path, "rb") as pdf:
+
+                st.download_button(
+                    "📕 PDF",
+                    pdf,
+                    "chat.pdf"
                 )
 
-                # Similarity Score
-                if "score" in item:
-                    try:
-                        raw = float(item["score"])
-                        # FAISS inner-product can exceed 1; clamp to valid Streamlit range.
-                        clamped = max(0.0, min(raw, 1.0))
-                    except Exception:
-                        clamped = 0.0
-
-                    st.progress(clamped)
-
-                    st.caption(
-                        f"Similarity : {item['score']:.2f}"
-                    )
-
-                st.info(item["text"])
-
-        # -------------------------
-        # EXPORT
-        # -------------------------
-
-        st.download_button(
-            label="📥 Export Chat",
-            data=answer,
-            file_name="chat.txt",
-            mime="text/plain"
-        )
-
-        # -------------------------
-        # TEXT TO SPEECH
-        # -------------------------
-
-        tts_html = f"""
-        <script>
-        let speech = new SpeechSynthesisUtterance();
-        speech.text = `{answer}`;
-        speech.lang = 'en-US';
-        speech.rate = 1;
-        speech.pitch = 1;
-        </script>
-        """
-
-        st.components.v1.html(
-            tts_html,
-            height=0
-        )
+# =====================================
+# NO DOCUMENTS
+# =====================================
 
 else:
 
     st.info(
-        "👈 Upload one or more documents from the sidebar."
-    )
+        """
+👈 Upload one or more documents from the sidebar.
 
-# ===================================
-# FOOTER
-# ===================================
+Supported formats:
+
+• PDF
+• DOCX
+• TXT
+• CSV
+• Excel
+"""
+    )
+# =====================================
+# ANALYTICS DASHBOARD
+# =====================================
 
 st.markdown("---")
 
+with st.expander("📊 Chat Analytics", expanded=False):
+
+    total_messages = len(st.session_state.messages)
+
+    user_messages = len(
+        [
+            msg
+            for msg in st.session_state.messages
+            if msg["role"] == "user"
+        ]
+    )
+
+    assistant_messages = len(
+        [
+            msg
+            for msg in st.session_state.messages
+            if msg["role"] == "assistant"
+        ]
+    )
+
+    col1, col2, col3 = st.columns(3)
+
+    col1.metric(
+        "💬 Total Messages",
+        total_messages
+    )
+
+    col2.metric(
+        "👤 User",
+        user_messages
+    )
+
+    col3.metric(
+        "🤖 Assistant",
+        assistant_messages
+    )
+
+    if st.button("📈 Open Dashboard"):
+
+        try:
+
+            show_dashboard(
+                st.session_state.messages
+            )
+
+        except Exception:
+
+            st.info("Analytics Dashboard not available.")
+
+# =====================================
+# ABOUT
+# =====================================
+
+with st.expander("ℹ About This Project", expanded=False):
+
+    st.markdown("""
+### Professional RAG Chatbot
+
+This chatbot supports:
+
+✅ PDF
+
+✅ DOCX
+
+✅ TXT
+
+✅ CSV
+
+✅ Excel
+
+✅ FAISS Vector Search
+
+✅ Sentence Transformers
+
+✅ Gemini AI
+
+✅ Conversation Memory
+
+✅ Export Chat
+
+✅ Analytics Dashboard
+
+Built using:
+
+- Streamlit
+- Google Gemini
+- FAISS
+- Sentence Transformers
+- Python
+""")
+
+# =====================================
+# FOOTER
+# =====================================
+
+st.markdown("---")
+
+col1, col2, col3 = st.columns(3)
+
+with col1:
+
+    st.caption("🤖 Gemini AI")
+
+with col2:
+
+    st.caption("🔍 FAISS Vector Search")
+
+with col3:
+
+    st.caption("⚡ Streamlit")
+
+st.markdown(
+    "<center><h5>🚀 Professional RAG Chatbot</h5></center>",
+    unsafe_allow_html=True
+)
+
 st.caption(
-    "Professional RAG Chatbot | Gemini • FAISS • Sentence Transformers • Streamlit"
+    "Made with ❤️ using Python, Streamlit, Gemini AI and FAISS."
 )
