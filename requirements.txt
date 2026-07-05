@@ -1,0 +1,14 @@
+streamlit
+google-genai
+sentence-transformers
+faiss-cpu
+numpy
+pandas
+pypdf
+python-docx
+openpyxl
+python-dotenv
+SpeechRecognition
+pyttsx3
+reportlab
+pyaudio
