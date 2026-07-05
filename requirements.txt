@@ -8,7 +8,5 @@ pypdf
 python-docx
 openpyxl
 python-dotenv
-SpeechRecognition
-pyttsx3
 reportlab
 gTTS
