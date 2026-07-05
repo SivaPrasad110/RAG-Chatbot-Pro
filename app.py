@@ -1,5 +1,5 @@
-import os
 import streamlit as st
+import os
 
 from utils import (
     read_pdf,
@@ -16,167 +16,67 @@ from rag import (
     ask_gemini
 )
 
-from analytics import show_dashboard
-
 from export import (
     export_txt,
     export_markdown,
     export_pdf
 )
 
-# ===================================================
+# =====================================================
 # PAGE CONFIG
-# ===================================================
+# =====================================================
 
 st.set_page_config(
     page_title="RAG Chatbot Pro",
-    page_icon="🤖",
+    page_icon="✨",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# ===================================================
+# =====================================================
+# SESSION STATE
+# =====================================================
+
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+if "chunks" not in st.session_state:
+    st.session_state.chunks = []
+
+if "index" not in st.session_state:
+    st.session_state.index = None
+
+if "documents_loaded" not in st.session_state:
+    st.session_state.documents_loaded = False
+
+# =====================================================
 # CUSTOM CSS
-# ===================================================
+# =====================================================
 
 st.markdown("""
 <style>
 
-/* ----------------------------
-Main Container
------------------------------*/
+/* Main */
 
-.block-container{
+.stApp{
 
-    max-width:1150px;
-
-    padding-top:1rem;
-
-    padding-bottom:2rem;
+background:
+radial-gradient(circle at center,
+#172554 0%,
+#111827 45%,
+#0b0b0b 100%);
 
 }
 
-/* ----------------------------
-Sidebar
------------------------------*/
+/* Remove Header */
 
-section[data-testid="stSidebar"]{
+header{
 
-    background:#1d1f23;
+visibility:hidden;
 
 }
 
-/* ----------------------------
-Header
------------------------------*/
-
-.main-title{
-
-    text-align:center;
-
-    font-size:48px;
-
-    font-weight:700;
-
-    margin-bottom:5px;
-
-}
-
-.sub-title{
-
-    text-align:center;
-
-    color:gray;
-
-    font-size:18px;
-
-    margin-bottom:30px;
-
-}
-
-/* ----------------------------
-Cards
------------------------------*/
-
-.metric-card{
-
-    background:#262730;
-
-    padding:15px;
-
-    border-radius:15px;
-
-    text-align:center;
-
-    border:1px solid rgba(255,255,255,.05);
-
-}
-
-/* ----------------------------
-Chat Messages
------------------------------*/
-
-.stChatMessage{
-
-    border-radius:18px;
-
-    padding:16px;
-
-    margin-top:10px;
-
-    margin-bottom:10px;
-
-}
-
-/* ----------------------------
-Buttons
------------------------------*/
-
-.stButton>button{
-
-    width:100%;
-
-    border-radius:10px;
-
-    height:45px;
-
-}
-
-/* ----------------------------
-Download Buttons
------------------------------*/
-
-.stDownloadButton>button{
-
-    width:100%;
-
-    border-radius:10px;
-
-}
-
-/* ----------------------------
-File Upload
------------------------------*/
-
-[data-testid="stFileUploader"]{
-
-    border-radius:15px;
-
-}
-
-/* ----------------------------
-Progress
------------------------------*/
-
-.stProgress{
-
-    border-radius:20px;
-
-}
-
-/* ----------------------------
-Hide Footer
------------------------------*/
+/* Footer */
 
 footer{
 
@@ -184,45 +84,186 @@ visibility:hidden;
 
 }
 
+/* Main Width */
+
+.block-container{
+
+max-width:1250px;
+
+padding-top:2rem;
+
+}
+
+/* Sidebar */
+
+section[data-testid="stSidebar"]{
+
+background:#111827;
+
+border-right:1px solid #222;
+
+}
+
+/* Sidebar text */
+
+section[data-testid="stSidebar"] *{
+
+color:white;
+
+}
+
+/* Buttons */
+
+.stButton>button{
+
+width:100%;
+
+height:48px;
+
+border-radius:15px;
+
+background:#1F2937;
+
+border:1px solid #374151;
+
+color:white;
+
+font-weight:600;
+
+}
+
+.stButton>button:hover{
+
+background:#2563EB;
+
+}
+
+/* Chat input */
+
+div[data-testid="stChatInput"]{
+
+padding-top:20px;
+
+}
+
+/* Chat message */
+
+.stChatMessage{
+
+border-radius:18px;
+
+padding:15px;
+
+}
+
+/* Suggestion Card */
+
+.suggest{
+
+background:#1E293B;
+
+padding:12px;
+
+border-radius:14px;
+
+text-align:center;
+
+font-weight:600;
+
+border:1px solid #334155;
+
+}
+
+.suggest:hover{
+
+background:#2563EB;
+
+cursor:pointer;
+
+}
+
+/* Hero */
+
+.hero{
+
+text-align:center;
+
+padding-top:40px;
+
+padding-bottom:20px;
+
+}
+
+.hero h1{
+
+font-size:60px;
+
+font-weight:700;
+
+margin-bottom:10px;
+
+color:white;
+
+}
+
+.hero p{
+
+font-size:22px;
+
+color:#D1D5DB;
+
+}
+
+/* Footer */
+
+.footer{
+
+text-align:center;
+
+color:#9CA3AF;
+
+padding-top:60px;
+
+}
+
 </style>
 """, unsafe_allow_html=True)
 
-# ===================================================
-# SESSION STATE
-# ===================================================
-
-if "messages" not in st.session_state:
-    st.session_state.messages=[]
-
-if "chunks" not in st.session_state:
-    st.session_state.chunks=[]
-
-if "index" not in st.session_state:
-    st.session_state.index=None
-
-if "documents_loaded" not in st.session_state:
-    st.session_state.documents_loaded=False
-
-# ===================================================
+# =====================================================
 # SIDEBAR
-# ===================================================
+# =====================================================
 
 with st.sidebar:
 
-    st.image(
-        "https://streamlit.io/images/brand/streamlit-logo-primary-colormark-darktext.png",
-        width=80
-    )
+    st.markdown("## ✨ RAG Chatbot Pro")
 
-    st.title("RAG Chatbot Pro")
-
-    st.caption("Professional AI Document Assistant")
+    st.caption("Gemini Powered")
 
     st.markdown("---")
 
+    if st.button("➕ New Chat"):
+
+        st.session_state.messages=[]
+
+        st.rerun()
+
+    st.markdown("### 🕒 Recent Chats")
+
+    st.caption("• AI Project")
+
+    st.caption("• Final Report")
+
+    st.caption("• Research Paper")
+
+    st.caption("• Resume")
+
+    st.markdown("---")
+
+    st.subheader("📂 Upload Documents")
+
     uploaded_files=st.file_uploader(
 
-        "📂 Upload Documents",
+        "",
 
         type=[
             "pdf",
@@ -238,20 +279,20 @@ with st.sidebar:
 
     st.markdown("---")
 
-    st.subheader("⚙ AI Settings")
+    st.subheader("⚙ Settings")
 
     top_k=st.slider(
         "Retrieved Chunks",
         1,
         10,
-        3
+        5
     )
 
     chunk_size=st.slider(
         "Chunk Size",
         200,
         1200,
-        600,
+        700,
         100
     )
 
@@ -265,281 +306,139 @@ with st.sidebar:
 
     st.markdown("---")
 
-    if st.button("🗑 Clear Chat"):
+    st.markdown("### 👤 Siva Prasad")
 
-        st.session_state.messages=[]
+    st.caption("🟢 Gemini Connected")
 
-        st.rerun()
-
-# ===================================================
-# HERO SECTION
-# ===================================================
+# =====================================================
+# HERO
+# =====================================================
 
 st.markdown("""
-<div style="
-background:linear-gradient(135deg,#4F46E5,#06B6D4);
-padding:35px;
-border-radius:20px;
-text-align:center;
-color:white;
-margin-bottom:25px;
-box-shadow:0px 6px 20px rgba(0,0,0,0.25);
-">
 
-<h1 style="
-margin:0;
-font-size:48px;
-font-weight:700;
-">
+<div class="hero">
 
-🤖 RAG Chatbot Pro
+<h1>
+
+Hello, Siva 👋
 
 </h1>
 
-<p style="
-font-size:20px;
-margin-top:12px;
-margin-bottom:0;
-">
+<p>
 
-💬 Chat with your Documents using
-<b>Gemini AI + FAISS + Sentence Transformers</b>
+How can I help you today?
 
 </p>
 
 </div>
+
 """, unsafe_allow_html=True)
 
-# ===================================================
-# DASHBOARD
-# ===================================================
+# =====================================================
+# SUGGESTION BUTTONS
+# =====================================================
 
-c1,c2,c3,c4=st.columns(4)
+c1,c2,c3=st.columns(3)
 
 with c1:
 
-    st.metric(
-        "📄 Documents",
-        len(uploaded_files) if uploaded_files else 0
+    st.markdown(
+        '<div class="suggest">📄 Summarize Document</div>',
+        unsafe_allow_html=True
     )
 
 with c2:
 
-    st.metric(
-        "🧠 Chunks",
-        len(st.session_state.chunks)
+    st.markdown(
+        '<div class="suggest">💡 Explain Concepts</div>',
+        unsafe_allow_html=True
     )
 
 with c3:
 
-    st.metric(
-        "💬 Messages",
-        len(st.session_state.messages)
+    st.markdown(
+        '<div class="suggest">📊 Generate Insights</div>',
+        unsafe_allow_html=True
     )
 
-with c4:
+st.markdown("<br>",unsafe_allow_html=True)
+# =====================================================
+# AI PROMPT SECTION
+# =====================================================
 
-    st.metric(
-        "🤖 Model",
-        "Gemini"
+st.markdown("<br>", unsafe_allow_html=True)
+
+container = st.container(border=True)
+
+with container:
+
+    st.markdown("""
+    <h3 style="text-align:center;">
+    💬 Ask AI Anything
+    </h3>
+
+    <p style="text-align:center;color:#9CA3AF;">
+    Upload documents and ask questions using Retrieval-Augmented Generation.
+    </p>
+    """, unsafe_allow_html=True)
+
+    c1, c2, c3, c4 = st.columns([2,2,2,2])
+
+    with c1:
+        st.button(
+            "📄 Summarize",
+            use_container_width=True
+        )
+
+    with c2:
+        st.button(
+            "💡 Explain",
+            use_container_width=True
+        )
+
+    with c3:
+        st.button(
+            "📊 Insights",
+            use_container_width=True
+        )
+
+    with c4:
+        st.button(
+            "📑 Compare",
+            use_container_width=True
+        )
+
+st.markdown("<br>", unsafe_allow_html=True)
+
+# =====================================================
+# CHAT INPUT
+# =====================================================
+
+question = st.chat_input(
+    "Ask anything about your uploaded documents..."
+)
+# =====================================================
+# CHAT CONVERSATION
+# =====================================================
+
+st.markdown("<br>", unsafe_allow_html=True)
+
+chat_box = st.container(border=True)
+
+with chat_box:
+
+    st.markdown(
+        """
+        <h3 style='text-align:center;'>
+        💬 Conversation
+        </h3>
+        """,
+        unsafe_allow_html=True
     )
 
-st.markdown("---")
-# ===================================================
-# DOCUMENT PROCESSING
-# ===================================================
-
-if uploaded_files:
-
-    all_pages = []
-
-    st.success(
-        f"📂 {len(uploaded_files)} document(s) selected."
-    )
-
-    with st.container(border=True):
-
-        st.subheader("📄 Uploaded Documents")
-
-        cols = st.columns(2)
-
-        for i, file in enumerate(uploaded_files):
-
-            with cols[i % 2]:
-
-                st.success(f"✅ {file.name}")
-
-    st.markdown("---")
-
-    with st.spinner("📚 Reading documents..."):
-
-        progress = st.progress(0)
-
-        total_files = len(uploaded_files)
-
-        status = st.empty()
-
-        for i, file in enumerate(uploaded_files):
-
-            extension = os.path.splitext(file.name)[1].lower()
-
-            status.info(f"Processing : {file.name}")
-
-            try:
-
-                # PDF
-
-                if extension == ".pdf":
-
-                    pages = read_pdf(file)
-
-                    for page in pages:
-                        page["source"] = file.name
-
-                    all_pages.extend(pages)
-
-                # DOCX
-
-                elif extension == ".docx":
-
-                    pages = read_docx(file)
-
-                    for page in pages:
-                        page["source"] = file.name
-
-                    all_pages.extend(pages)
-
-                # TXT
-
-                elif extension == ".txt":
-
-                    pages = read_txt(file)
-
-                    for page in pages:
-                        page["source"] = file.name
-
-                    all_pages.extend(pages)
-
-                # CSV
-
-                elif extension == ".csv":
-
-                    pages = read_csv(file)
-
-                    for page in pages:
-                        page["source"] = file.name
-
-                    all_pages.extend(pages)
-
-                # Excel
-
-                elif extension == ".xlsx":
-
-                    pages = read_excel(file)
-
-                    for page in pages:
-                        page["source"] = file.name
-
-                    all_pages.extend(pages)
-
-            except Exception as e:
-
-                st.error(f"❌ {file.name}")
-
-                st.exception(e)
-
-            progress.progress((i + 1) / total_files)
-
-        progress.empty()
-
-        status.empty()
-
-    st.toast("🎉 Documents loaded successfully!")
-
-    # ==========================================
-    # Chunking
-    # ==========================================
-
-    with st.spinner("✂ Creating document chunks..."):
-
-        chunks = split_text(
-
-            all_pages,
-
-            chunk_size=chunk_size,
-
-            overlap=overlap
-
-        )
-
-    # ==========================================
-    # Vector Store
-    # ==========================================
-
-    with st.spinner("🧠 Building Vector Database..."):
-
-        index = create_vector_store(chunks)
-
-    # Save
-
-    st.session_state.chunks = chunks
-
-    st.session_state.index = index
-
-    st.session_state.documents_loaded = True
-
-    # ==========================================
-    # Statistics
-    # ==========================================
-
-    st.markdown("---")
-
-    a, b, c = st.columns(3)
-
-    with a:
-
-        st.metric(
-
-            "📄 Documents",
-
-            len(uploaded_files)
-
-        )
-
-    with b:
-
-        st.metric(
-
-            "📚 Chunks",
-
-            len(chunks)
-
-        )
-
-    with c:
-
-        st.metric(
-
-            "🤖 Status",
-
-            "Ready"
-
-        )
-
-    st.success("✅ AI is ready. Ask your question below.")
-    # ===================================================
-# CHAT AREA
-# ===================================================
-
-st.markdown("## 💬 Chat")
-
-chat_container = st.container()
-
-with chat_container:
-
-    # -------------------------
-    # Previous Messages
-    # -------------------------
+    # -----------------------------
+    # Display Previous Messages
+    # -----------------------------
 
     for message in st.session_state.messages:
 
@@ -552,9 +451,9 @@ with chat_container:
 
             st.markdown(message["content"])
 
-# ===================================================
-# CHAT INPUT
-# ===================================================
+# =====================================================
+# ASK QUESTION
+# =====================================================
 
 if st.session_state.documents_loaded:
 
@@ -564,14 +463,14 @@ if st.session_state.documents_loaded:
 
     if question:
 
-        # -------------------------
-        # USER MESSAGE
-        # -------------------------
+        # ------------------------------------
+        # USER
+        # ------------------------------------
 
         st.session_state.messages.append(
             {
-                "role": "user",
-                "content": question
+                "role":"user",
+                "content":question
             }
         )
 
@@ -579,12 +478,11 @@ if st.session_state.documents_loaded:
             "user",
             avatar="👤"
         ):
-
             st.markdown(question)
 
-        # -------------------------
+        # ------------------------------------
         # SEARCH
-        # -------------------------
+        # ------------------------------------
 
         with st.spinner("🔍 Searching documents..."):
 
@@ -600,9 +498,9 @@ if st.session_state.documents_loaded:
 
             )
 
-        # -------------------------
-        # CREATE CONTEXT
-        # -------------------------
+        # ------------------------------------
+        # BUILD CONTEXT
+        # ------------------------------------
 
         context = ""
 
@@ -620,33 +518,46 @@ Content :
 
 """
 
-        # -------------------------
-        # GEMINI
-        # -------------------------
+        # ------------------------------------
+        # AI RESPONSE
+        # ------------------------------------
 
         with st.chat_message(
             "assistant",
             avatar="🤖"
         ):
 
-            placeholder = st.empty()
+            thinking = st.empty()
 
-            placeholder.info(
-                "🤖 Gemini is thinking..."
-            )
+            thinking.info("🤖 Gemini is thinking...")
 
             answer = ask_gemini(
+
                 question,
+
                 context
+
             )
 
-            placeholder.empty()
+            thinking.empty()
 
-            st.markdown(answer)
+            # Typing animation
 
-        # -------------------------
-        # SAVE MESSAGE
-        # -------------------------
+            output = st.empty()
+
+            text = ""
+
+            for word in answer.split():
+
+                text += word + " "
+
+                output.markdown(text + "▌")
+
+            output.markdown(answer)
+
+        # ------------------------------------
+        # SAVE CHAT
+        # ------------------------------------
 
         st.session_state.messages.append(
             {
@@ -655,102 +566,55 @@ Content :
             }
         )
 
-        # -------------------------
-        # EXPORT
-        # -------------------------
-
-        st.markdown("---")
-
-        col1,col2,col3=st.columns(3)
-
-        with col1:
-
-            st.download_button(
-
-                "📄 TXT",
-
-                export_txt(
-                    st.session_state.messages
-                ),
-
-                "chat.txt"
-
-            )
-
-        with col2:
-
-            st.download_button(
-
-                "📝 Markdown",
-
-                export_markdown(
-                    st.session_state.messages
-                ),
-
-                "chat.md"
-
-            )
-
-        with col3:
-
-            pdf_path = export_pdf(
-                st.session_state.messages
-            )
-
-            with open(pdf_path,"rb") as pdf:
-
-                st.download_button(
-
-                    "📕 PDF",
-
-                    pdf,
-
-                    "chat.pdf"
-
-                )
-
 else:
 
     st.info(
         """
 👋 Welcome!
 
-Upload one or more documents from the sidebar.
+Upload documents from the left sidebar.
 
-Supported Files
+Then ask any question.
 
-✅ PDF
+Supported files
 
-✅ DOCX
+• PDF
 
-✅ TXT
+• DOCX
 
-✅ CSV
+• TXT
 
-✅ Excel
+• CSV
 
-Then start chatting with your documents.
+• Excel
+
+Your answers are generated using
+Gemini AI + FAISS + RAG.
 """
     )
-# ===================================================
+# =====================================================
 # SIDEBAR DASHBOARD
-# ===================================================
+# =====================================================
 
 with st.sidebar:
 
     st.markdown("---")
 
-    st.subheader("📊 Dashboard")
+    st.subheader("📊 Workspace")
 
-    st.metric(
-        "💬 Total Messages",
-        len(st.session_state.messages)
-    )
+    col1, col2 = st.columns(2)
 
-    st.metric(
-        "📄 Documents",
-        len(uploaded_files) if uploaded_files else 0
-    )
+    with col1:
+        st.metric(
+            "📄 Docs",
+            len(uploaded_files) if uploaded_files else 0
+        )
+
+    with col2:
+        st.metric(
+            "💬 Chat",
+            len(st.session_state.messages)
+        )
 
     st.metric(
         "🧠 Chunks",
@@ -763,97 +627,137 @@ with st.sidebar:
 
     else:
 
-        st.warning("🟡 Waiting for Documents")
+        st.warning("🟡 Upload Documents")
 
-# ===================================================
-# WELCOME PAGE
-# ===================================================
+# =====================================================
+# EXPORT
+# =====================================================
 
-if not uploaded_files:
+    st.markdown("---")
 
-    st.markdown("<br>", unsafe_allow_html=True)
+    st.subheader("📥 Export")
 
-    c1,c2,c3=st.columns(3)
-
-    with c2:
-
-        st.image(
-            "https://cdn-icons-png.flaticon.com/512/4712/4712109.png",
-            width=180
-        )
-
-    st.markdown(
-        """
-        <h2 style='text-align:center'>
-        Welcome to RAG Chatbot Pro
-        </h2>
-
-        <p style='text-align:center;color:gray;'>
-
-        Upload your documents and start chatting with AI.
-
-        </p>
-        """,
-        unsafe_allow_html=True
+    st.download_button(
+        "📄 TXT",
+        export_txt(
+            st.session_state.messages
+        ),
+        "chat.txt",
+        use_container_width=True
     )
 
-# ===================================================
-# FEATURES
-# ===================================================
+    st.download_button(
+        "📝 Markdown",
+        export_markdown(
+            st.session_state.messages
+        ),
+        "chat.md",
+        use_container_width=True
+    )
 
-st.markdown("---")
+    if st.button(
+        "📕 Generate PDF",
+        use_container_width=True
+    ):
 
-st.subheader("✨ Features")
+        pdf_path = export_pdf(
+            st.session_state.messages
+        )
 
-col1,col2,col3=st.columns(3)
+        with open(
+            pdf_path,
+            "rb"
+        ) as pdf:
+
+            st.download_button(
+
+                "⬇ Download PDF",
+
+                pdf,
+
+                "chat.pdf",
+
+                use_container_width=True
+
+            )
+
+# =====================================================
+# QUICK ACTIONS
+# =====================================================
+
+st.markdown("<br>", unsafe_allow_html=True)
+
+st.markdown("### ⚡ Quick Actions")
+
+col1,col2,col3,col4=st.columns(4)
 
 with col1:
 
-    st.info("""
-📄 PDF
-
-📑 DOCX
-
-📊 Excel
-
-📈 CSV
-
-📝 TXT
-""")
+    if st.button(
+        "📄 Summarize",
+        use_container_width=True
+    ):
+        st.info("Ask AI to summarize your uploaded document.")
 
 with col2:
 
-    st.info("""
-🤖 Gemini AI
-
-🧠 FAISS
-
-📚 RAG
-
-💬 Chat Memory
-
-⚡ Fast Search
-""")
+    if st.button(
+        "💡 Explain",
+        use_container_width=True
+    ):
+        st.info("Ask AI to explain any topic.")
 
 with col3:
 
-    st.info("""
-📥 Export PDF
+    if st.button(
+        "📊 Insights",
+        use_container_width=True
+    ):
+        st.info("Generate key insights from the document.")
 
-📥 Export TXT
+with col4:
 
-📥 Markdown
+    if st.button(
+        "📑 Compare",
+        use_container_width=True
+    ):
+        st.info("Compare two uploaded documents.")
 
-📊 Dashboard
+# =====================================================
+# ABOUT
+# =====================================================
 
-☁ Streamlit Cloud
+with st.expander(
+    "🚀 About RAG Chatbot Pro",
+    expanded=False
+):
+
+    st.markdown("""
+
+### 🤖 RAG Chatbot Pro
+
+Professional AI-powered document assistant.
+
+### Features
+
+- 📄 PDF
+- 📑 DOCX
+- 📊 Excel
+- 📈 CSV
+- 📝 TXT
+- 🔍 FAISS Search
+- 🤖 Gemini AI
+- 💬 Chat Memory
+- 📥 Export Chat
+- ⚡ Streamlit
+
 """)
 
-# ===================================================
+# =====================================================
 # FOOTER
-# ===================================================
+# =====================================================
 
-st.markdown("<br><br>",unsafe_allow_html=True)
+st.markdown("<br><br>", unsafe_allow_html=True)
 
 st.markdown("---")
 
@@ -863,15 +767,13 @@ st.markdown(
 
 <h3>🤖 RAG Chatbot Pro</h3>
 
-Professional Retrieval-Augmented Generation Chatbot
+<p>
 
-Built with
+Powered by
 
-<b>Streamlit • Gemini AI • FAISS • Sentence Transformers</b>
+<b>Gemini AI • FAISS • Sentence Transformers</b>
 
-<br><br>
-
-Made with ❤️ by <b>Siva Prasad</b>
+</p>
 
 </div>
 """,
