@@ -102,9 +102,6 @@ overlap = sidebar_data["overlap"]
 hero_section()
 
 suggestion_cards()
-hero_section()
-
-suggestion_cards()
 # ==========================================
 # DOCUMENT PROCESSING
 # ==========================================
