@@ -14,3 +14,4 @@ GEMINI_MODEL = "gemini-2.0-flash"
 
 # Alternative:
 # GEMINI_MODEL = "gemini-1.5-flash"
+print("API Key:", GEMINI_API_KEY[:10])
