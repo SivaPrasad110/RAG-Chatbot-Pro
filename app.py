@@ -5,13 +5,12 @@ from styles import load_css
 from sidebar import sidebar
 
 from ui import (
-
     hero_section,
-
     suggestion_cards,
-
-    chat_interface
-
+    chat_interface,
+    conversation_stats,
+    ai_status,
+    footer
 )
 
 from rag import (
@@ -456,3 +455,8 @@ Made with ❤️ by **Siva Prasad**
 """,
     unsafe_allow_html=True
 )
+conversation_stats()
+
+ai_status()
+
+footer()
